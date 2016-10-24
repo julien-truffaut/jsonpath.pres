@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>JsonPath: Type safe query DSL using optics</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif', 'Helvetica'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz', 'Gill Sans';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+```tut:invisible
+
+```
+
+class: center, middle
+
+# JsonPath: Type safe query DSL using optics
+Julien Truffaut • `@JulienTruffaut`
+
+???
+- notes here
+- see https://remarkjs.com/#1
+
+---
+# Json
+
+```tut:silent
+sealed trait Json
+
+case object JNull extends Json
+case class JBool(v: Boolean) extends Json
+case class JNumber(v: Double) extends Json
+case class JString(v: String) extends Json
+
+case class JArr(v: List[Json]) extends Json
+case class JObj(v: Map[String, Json]) extends Json
+```
+
+---
+# Prism
+
+```tut:silent
+import monocle.Prism
+
+val jBool = Prism.partial[Json, Boolean]{case JBool(v) => v}(JBool)
+```
+
+```tut:book
+jBool.getOption(JBool(true))
+jBool.getOption(JString("Hello"))
+
+jBool(false)
+```
+--
+
+```scala
+val jNull:   Prism[Json, Unit]
+val jBool:   Prism[Json, Boolean]
+val jNumber: Prism[Json, Double]
+val jString: Prism[Json, String]
+val jArr:    Prism[Json, List[Json]]
+val jObj:    Prism[Json, Map[String, Json]]
+```
+---
+# Optional
+
+```tut:silent
+import monocle.Optional
+
+def headOption[A]: Optional[List[A], A] =
+  Optional[List[A], A](_.headOption)(h => {
+    case Nil     => Nil
+    case _ :: xs => h :: xs
+  })
+```
+
+```tut:book
+val xs = List(1, 4, 9)
+
+headOption.getOption(xs)
+
+headOption.set(5)(xs)
+headOption.modify((_: Int) + 1)(xs)
+
+headOption.modify((_: Int) + 1)(Nil)
+headOption.modifyOption((_: Int) + 1)(xs)
+```
+
+---
+# Optional
+
+```tut:silent
+def index[A](i: Int): Optional[List[A], A] = ???
+```
+
+--
+
+```tut:silent
+def indexV[A](i: Int): Optional[Vector[A], A] = ???
+
+def indexM[K, V](k: K): Optional[Map[K, V], V] = ???
+```
+
+--
+
+```tut:silent
+trait Index[S, I, A]{
+  def index(i: I): Optional[S, A]
+}
+
+implicit def listIndex[A]: Index[List[A], Int, A] = ???
+
+implicit def mapIndex[K, V]: Index[Map[K, V], K, V] = ???
+```
+
+
+---
+# Inline Scala examples
+
+```tut:silent
+case class Person(name: String, age: Int)
+```
+
+```tut:book
+val john = Person("John", 23)
+
+john.age
+
+john.copy(age = 30)
+```
+
+???
+- see https://github.com/tpolecat/tut
+
+---
+# Scala examples from core module
+
+```tut:silent
+import jsonpath.Foo.{FooInt, FooString}
+```
+
+```tut:book
+val fooInt = FooInt(5)
+val fooString = FooString("Hello World")
+
+val foos = List(fooInt, fooString)
+```
+
+---
+class: center, middle
+
+# Thanks!
+Code and slides at `julien-truffaut/JsonPath` on GitHub
+
+## Questions?
+
+
+
+
+
+ </textarea>
+    <script src="remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
