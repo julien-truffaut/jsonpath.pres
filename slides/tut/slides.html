@@ -40,8 +40,8 @@ sealed trait Json
 
 case object JNull extends Json
 case class JBool(v: Boolean) extends Json
-case class JNumber(v: Double) extends Json
-case class JString(v: String) extends Json
+case class JNum(v: Double) extends Json
+case class JStr(v: String) extends Json
 
 case class JArr(v: List[Json]) extends Json
 case class JObj(v: Map[String, Json]) extends Json
@@ -53,25 +53,85 @@ case class JObj(v: Map[String, Json]) extends Json
 ```tut:silent
 import monocle.Prism
 
-val jBool = Prism.partial[Json, Boolean]{case JBool(v) => v}(JBool)
+val jNum = Prism.partial[Json, Double]{case JNum(v) => v}(JNum)
 ```
 
 ```tut:book
-jBool.getOption(JBool(true))
-jBool.getOption(JString("Hello"))
+jNum(12.2)
 
-jBool(false)
+jNum.getOption(JNum(4.5))
+jNum.getOption(JStr("Hello"))
 ```
+
 --
 
-```scala
-val jNull:   Prism[Json, Unit]
-val jBool:   Prism[Json, Boolean]
-val jNumber: Prism[Json, Double]
-val jString: Prism[Json, String]
-val jArr:    Prism[Json, List[Json]]
-val jObj:    Prism[Json, Map[String, Json]]
+```tut:silent
+def isNum(json: Json): Boolean = json match {
+  case jNum(n) => true
+  case other   => false
+}
 ```
+
+---
+# Safe cast
+
+```tut:silent
+import monocle.std.double.doubleToInt
+```
+
+```tut:book
+doubleToInt(5)
+doubleToInt.getOption(3.0)
+doubleToInt.getOption(3.2)
+```
+
+---
+# Prism composition
+
+```tut:silent
+val jInt: Prism[Json, Int] = jNum composePrism doubleToInt
+```
+
+```tut:book
+jInt(10)
+jInt.getOption(JNum(3.0))
+jInt.getOption(JNum(3.2))
+jInt.getOption(JStr("Hello"))
+```
+
+```tut:silent
+def isEven(json: Json): Boolean = json match {
+  case jInt(n) => n % 2 == 0
+  case other   => false
+}
+```
+
+---
+# Prisms
+
+```scala
+val jNull: Prism[Json, Unit]
+val jBool: Prism[Json, Boolean]
+val jNum:  Prism[Json, Double]
+val jInt:  Prism[Json, Int]
+val jStr:  Prism[Json, String]
+val jArr:  Prism[Json, List[Json]]
+val jObj:  Prism[Json, Map[String, Json]]
+```
+
+```tut:reset:invisible
+import jsonpath.Json._
+```
+
+```tut:book
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "doe_name"   -> jStr("doe"),
+  "age"        -> jInt(42)
+))
+```
+
+
 ---
 # Optional
 
@@ -83,11 +143,11 @@ def headOption[A]: Optional[List[A], A] =
     case Nil     => Nil
     case _ :: xs => h :: xs
   })
+
+val xs = List(1, 4, 9)
 ```
 
 ```tut:book
-val xs = List(1, 4, 9)
-
 headOption.getOption(xs)
 
 headOption.set(5)(xs)
@@ -124,37 +184,54 @@ implicit def listIndex[A]: Index[List[A], Int, A] = ???
 implicit def mapIndex[K, V]: Index[Map[K, V], K, V] = ???
 ```
 
-
 ---
-# Inline Scala examples
+# Index
+
+```tut:reset:invisible
+import jsonpath._
+import jsonpath.Json._
+import monocle.{Prism, Optional}
+```
 
 ```tut:silent
-case class Person(name: String, age: Int)
+import monocle.function.all._
+import monocle.std.list._
+```
+
+```tut:silent
+jArr                                           : Prism[Json, List[Json]]
+
+jArr composeOptional index(2)                  : Optional[Json, Json]
+
+jArr composeOptional index(2) composePrism jNum: Optional[Json, Double] 
+
+val array = JArr(List(1,2,3,4,5,6).map(jInt(_)))
+```
+
+
+```tut:book
+(jArr composeOptional index(2)).getOption(array)
+
+(jArr composeOptional index(2) composePrism jNum).modify(_ + 10)(array)
+```
+
+---
+# Index
+
+```tut:silent
+import monocle.std.map._
+
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "doe_name"   -> jStr("doe"),
+  "age"        -> jInt(42)
+))
 ```
 
 ```tut:book
-val john = Person("John", 23)
+(jObj composeOptional index("first_name")).getOption(john)
 
-john.age
-
-john.copy(age = 30)
-```
-
-???
-- see https://github.com/tpolecat/tut
-
----
-# Scala examples from core module
-
-```tut:silent
-import jsonpath.Foo.{FooInt, FooString}
-```
-
-```tut:book
-val fooInt = FooInt(5)
-val fooString = FooString("Hello World")
-
-val foos = List(fooInt, fooString)
+(jObj composeOptional index("age") composePrism jNum).modify(_ + 1)(john)
 ```
 
 ---
