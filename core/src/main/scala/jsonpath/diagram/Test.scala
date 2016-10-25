@@ -2,23 +2,20 @@ package jsonpath.diagram
 
 import java.nio.file.Paths
 
-import io.circe.{Json, JsonNumber}
+import io.circe.Json
+import reftree.contrib.SimplifiedInstances._
 import reftree.{Diagram, RefTree, RefTreeSyntax, ToRefTree}
 
 object Test extends App {
 
-  implicit val jsonNumberToReftree: ToRefTree[JsonNumber] = new ToRefTree[JsonNumber] {
-    def refTree(value: JsonNumber): RefTree = value.toDouble.refTree
-  }
-
-  implicit val refTreeJson: ToRefTree[Json] = new ToRefTree[Json] {
+  implicit def refTreeJson: ToRefTree[Json] = new ToRefTree[Json] {
     def refTree(value: Json): RefTree = value.fold(
       RefTree.Null(),
       _.refTree,
+      _.toDouble.refTree,
       _.refTree,
       _.refTree,
-      _.refTree,
-      _.toList.refTree
+      _.toMap.refTree
     )
   }
 

@@ -1,7 +1,13 @@
 package jsonpath
 
-import monocle.Prism
 import monocle.std.double.doubleToInt
+import monocle.{Prism, Traversal}
+
+import scala.util.Try
+import scalaz.Applicative
+import scalaz.std.list._
+import scalaz.std.map._
+import scalaz.syntax.traverse._
 
 sealed trait Json {
   override def toString: String = toString(1)
@@ -10,14 +16,16 @@ sealed trait Json {
     this match {
     case JNull    => "null"
     case JBool(v) => v.toString
-    case JNum(v)  => v.toString
+    case JNum(v)  => Try(v.toLong.toString).getOrElse(v.toString)
     case JStr(v)  => "\"" + v.toString + "\""
-    case JArr(v)  => v.mkString("[", ", ", "]")
+    case JArr(v)  => v.map(_.toString(depth)).mkString("[", ", ", "]")
     case JObj(vs) =>
       vs.map{ case (k, v) =>
-        List.fill(depth)("  ").mkString + s""""$k" : ${v.toString(depth + 1)}"""
-      }.mkString("{\n", ",\n", "\n}")
+        spaces(depth) + s""""$k" : ${v.toString(depth + 1)}"""
+      }.mkString("{\n", ",\n", "\n" + spaces(depth - 1) + "}")
   }
+
+  private def spaces(depth: Int): String = List.fill(depth)("  ").mkString
 }
 
 case object JNull extends Json
@@ -37,4 +45,13 @@ object Json {
   val jObj  = Prism.partial[Json, Map[String, Json]]{case JObj(v) => v}(JObj)
 
   val jInt = jNum composePrism doubleToInt
+
+  val jDescendants = new Traversal[Json, Json]{
+    def modifyF[F[_]: Applicative](f: Json => F[Json])(s: Json): F[Json] =
+      s match {
+        case jArr(v) => v.traverseU(f).map(jArr(_))
+        case jObj(v) => v.traverseU(f).map(jObj(_))
+        case _       => Applicative[F].pure(s)
+      }
+  }
 }

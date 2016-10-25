@@ -19,9 +19,6 @@
   <body>
     <textarea id="source">
 
-```tut:invisible
-
-```
 
 class: center, middle
 
@@ -79,7 +76,7 @@ def isNum(json: Json): Boolean = json match {
 import monocle.std.double.doubleToInt
 ```
 
-```tut:book
+```tut
 doubleToInt(5)
 doubleToInt.getOption(3.0)
 doubleToInt.getOption(3.2)
@@ -92,7 +89,7 @@ doubleToInt.getOption(3.2)
 val jInt: Prism[Json, Int] = jNum composePrism doubleToInt
 ```
 
-```tut:book
+```tut
 jInt(10)
 jInt.getOption(JNum(3.0))
 jInt.getOption(JNum(3.2))
@@ -123,10 +120,10 @@ val jObj:  Prism[Json, Map[String, Json]]
 import jsonpath.Json._
 ```
 
-```tut:book
+```tut:silent
 val john = jObj(Map(
   "first_name" -> jStr("john"),
-  "doe_name"   -> jStr("doe"),
+  "last_name"  -> jStr("doe"),
   "age"        -> jInt(42)
 ))
 ```
@@ -147,7 +144,7 @@ def headOption[A]: Optional[List[A], A] =
 val xs = List(1, 4, 9)
 ```
 
-```tut:book
+```tut
 headOption.getOption(xs)
 
 headOption.set(5)(xs)
@@ -209,7 +206,7 @@ val array = JArr(List(1,2,3,4,5,6).map(jInt(_)))
 ```
 
 
-```tut:book
+```tut
 (jArr composeOptional index(2)).getOption(array)
 
 (jArr composeOptional index(2) composePrism jNum).modify(_ + 10)(array)
@@ -223,22 +220,313 @@ import monocle.std.map._
 
 val john = jObj(Map(
   "first_name" -> jStr("john"),
-  "doe_name"   -> jStr("doe"),
+  "last_name"  -> jStr("doe"),
   "age"        -> jInt(42)
 ))
 ```
 
-```tut:book
+```tut
 (jObj composeOptional index("first_name")).getOption(john)
 
 (jObj composeOptional index("age") composePrism jNum).modify(_ + 1)(john)
 ```
 
 ---
+# Deep index
+
+```tut:silent
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+      ))
+   ))
+))
+
+val zoeAge = jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt)
+```
+
+---
+# Deep index
+
+```tut:silent
+val zoeAge = jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt)
+```
+
+```tut
+zoeAge.getOption(john)
+
+zoeAge.modify(_ + 1)(john)
+```
+
+---
+# Cut the boiler plate
+
+```tut:silent
+import monocle.function.all
+
+case class JsonPath(json: Optional[Json, Json]){
+  def `null` : Optional[Json, Unit]       = json composePrism jNull
+  def boolean: Optional[Json, Boolean]    = json composePrism jBool
+  def int    : Optional[Json, Int]        = json composePrism jInt
+  def double : Optional[Json, Double]     = json composePrism jNum
+  def string : Optional[Json, String]     = json composePrism jStr
+  def arr    : Optional[Json, List[Json]] = json composePrism jArr
+  def obj    : Optional[Json, Map[String, Json]] = json composePrism jObj
+
+  def index(i: Int)     : JsonPath = JsonPath(arr composeOptional all.index(i))
+  def index(key: String): JsonPath = JsonPath(obj composeOptional all.index(key))
+}
+```
+
+```scala
+val root = JsonPath(Optional.id)
+```
+
+---
+# JsonPath
+
+```tut:reset:invisible
+import monocle._
+import monocle.std.list._
+import monocle.std.map._
+import jsonpath._
+import jsonpath.Json._
+import jsonpath.JsonPath.root
+
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+      ))
+   ))
+))
+```
+
+```tut
+root.index("first_name").json.getOption(john)
+root.index("first_name").string.getOption(john)
+```
+--
+
+```tut
+root.index("siblings").index(0).index("age").int.set(55)(john)
+```
+
+---
+# More syntactic sugar
+
+```tut:silent
+import monocle.function.all
+import scala.language.dynamics
+
+case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
+  def `null` : Optional[Json, Unit]       = json composePrism jNull
+  def boolean: Optional[Json, Boolean]    = json composePrism jBool
+  def int    : Optional[Json, Int]        = json composePrism jInt
+  def double : Optional[Json, Double]     = json composePrism jNum
+  def string : Optional[Json, String]     = json composePrism jStr
+  def arr    : Optional[Json, List[Json]] = json composePrism jArr
+  def obj    : Optional[Json, Map[String, Json]] = json composePrism jObj
+
+  def index(i: Int): JsonPath = JsonPath(arr composeOptional all.index(i))
+
+  def selectDynamic(field: String): JsonPath =
+    JsonPath(obj composeOptional all.index(field))
+}
+```
+
+---
+# More syntactic sugar
+
+```tut:reset:invisible
+import monocle._
+import monocle.std.list._
+import monocle.std.map._
+import jsonpath._
+import jsonpath.Json._
+import jsonpath.JsonPath.root
+
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+      ))
+   ))
+))
+```
+
+```tut
+root.first_name.json.getOption(john)
+root.siblings.index(0).age.int.set(55)(john)
+```
+--
+
+```tut
+root.foo.bar.json.getOption(john)
+```
+
+---
+# Traversal
+
+```tut:silent
+import monocle.PTraversal
+import scalaz.std.list._
+
+def each[A]: Traversal[List[A], A] = PTraversal.fromTraverse[List, A, A]
+
+val xs = List(1,2,3,4)
+```
+
+```tut
+each[Int].getAll(xs)
+each[Int].set(0)(xs)
+each[Int].modify(_ + 1)(xs)
+```
+
+---
+# Traversal
+
+```tut:silent
+def eachL[A]: Traversal[List[A], A] = ???
+
+def eachV[A]: Traversal[Vector[A], A] = ???
+
+def eachM[K, V]: Traversal[Map[K, V], V] = ???
+```
+
+--
+
+```tut:silent
+trait Each[S, A]{
+  def each: Traversal[S, A]
+}
+
+implicit def eachList[A]: Each[List[A], A] = ???
+
+implicit def eachVector[A]: Each[Vector[A], A] = ???
+
+implicit def eachMap[K, V]: Each[Map[K, V], V] = ???
+```
+---
+# JsonTraversalPath
+
+```tut:silent
+import monocle.function.all
+import scala.language.dynamics
+
+case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
+  def `null` : Traversal[Json, Unit]       = json composePrism jNull
+  def boolean: Traversal[Json, Boolean]    = json composePrism jBool
+  def int    : Traversal[Json, Int]        = json composePrism jInt
+  def double : Traversal[Json, Double]     = json composePrism jNum
+  def string : Traversal[Json, String]     = json composePrism jStr
+  def arr    : Traversal[Json, List[Json]] = json composePrism jArr
+  def obj    : Traversal[Json, Map[String, Json]] = json composePrism jObj
+
+  def index(i: Int)     : JsonTraversalPath = JsonTraversalPath(arr composeOptional all.index(i))
+
+  def selectDynamic(field: String): JsonTraversalPath =
+    JsonTraversalPath(obj composeOptional all.index(field))
+
+  def each: JsonTraversalPath =
+    JsonTraversalPath(json composeTraversal jDescendants)
+}
+```
+
+```scala
+object JsonTraversalPath {
+  val root = JsonTraversalPath(Traversal.id)
+}
+```
+
+---
+# JsonPathTraversal
+
+```tut:reset:invisible
+import monocle._
+import monocle.std.list._
+import monocle.std.map._
+import jsonpath._
+import jsonpath.Json._
+import jsonpath.JsonPath.root
+
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+      ))
+   ))
+))
+```
+
+```tut
+root.each.json.getAll(john)
+root.each.string.getAll(john)
+root.each.string.modify(_.capitalize)(john)
+```
+
+---
+# JsonPathTraversal
+
+```tut:silent
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+    )),
+    jObj(Map(
+      "first_name" -> jStr("dan"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(24)
+    ))
+  ))
+))
+```
+
+```tut
+root.siblings.each.age.int.getAll(john)
+```
+
+
+
+
+---
 class: center, middle
 
 # Thanks!
-Code and slides at `julien-truffaut/JsonPath` on GitHub
+Code and slides at `julien-truffaut/jsonpath.pres` on GitHub
 
 ## Questions?
 
