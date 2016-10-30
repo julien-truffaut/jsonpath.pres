@@ -28,6 +28,20 @@ Julien Truffaut • `@JulienTruffaut`
 ???
 - notes here
 - see https://remarkjs.com/#1
+---
+# Tut
+
+```tut:book
+2 + 2 
+```
+
+```tut:fail
+"Hello World".foo
+```
+
+???
+- all the code in the slides are compiled using tut
+- all imports are here, all error messages come from scalac
 
 ---
 # Json
@@ -76,7 +90,7 @@ def isNum(json: Json): Boolean = json match {
 import monocle.std.double.doubleToInt
 ```
 
-```tut
+```tut:book
 doubleToInt(5)
 doubleToInt.getOption(3.0)
 doubleToInt.getOption(3.2)
@@ -89,7 +103,7 @@ doubleToInt.getOption(3.2)
 val jInt: Prism[Json, Int] = jNum composePrism doubleToInt
 ```
 
-```tut
+```tut:book
 jInt(10)
 jInt.getOption(JNum(3.0))
 jInt.getOption(JNum(3.2))
@@ -144,7 +158,7 @@ def headOption[A]: Optional[List[A], A] =
 val xs = List(1, 4, 9)
 ```
 
-```tut
+```tut:book
 headOption.getOption(xs)
 
 headOption.set(5)(xs)
@@ -206,7 +220,7 @@ val array = JArr(List(1,2,3,4,5,6).map(jInt(_)))
 ```
 
 
-```tut
+```tut:book
 (jArr composeOptional index(2)).getOption(array)
 
 (jArr composeOptional index(2) composePrism jNum).modify(_ + 10)(array)
@@ -330,7 +344,26 @@ root.index("siblings").index(0).index("age").int.set(55)(john)
 ```
 
 ---
-# More syntactic sugar
+# Dynamic
+
+```tut:silent
+import scala.language.dynamics
+
+class Foo extends Dynamic {
+  def bar: String = "bar"
+  def selectDynamic(s: String): String = s"Dynamic $s"
+}
+
+val foo = new Foo
+```
+
+```tut:book
+foo.bar
+foo.hello
+```
+
+---
+# Dynamic JsonPath
 
 ```tut:silent
 import monocle.function.all
@@ -353,7 +386,7 @@ case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
 ```
 
 ---
-# More syntactic sugar
+# Dynamic JsonPath
 
 ```tut:reset:invisible
 import monocle._
@@ -429,6 +462,25 @@ implicit def eachVector[A]: Each[Vector[A], A] = ???
 
 implicit def eachMap[K, V]: Each[Map[K, V], V] = ???
 ```
+
+---
+# Json Array / Object descendants
+
+```scala
+val jDescendants: Traversal[Json, Json] = ???
+```
+
+```tut:silent
+val arr = jArr(List(jInt(1), jInt(2), jInt(3)))
+val obj = jObj(Map("name" -> jStr("john"), "age" -> jInt(23)))
+```
+
+```tut
+jDescendants.set(jInt(1))(arr)
+jDescendants.set(jInt(1))(obj)
+jDescendants.set(jInt(1))(jStr("Hello"))
+```
+
 ---
 # JsonTraversalPath
 
@@ -445,19 +497,13 @@ case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
   def arr    : Traversal[Json, List[Json]] = json composePrism jArr
   def obj    : Traversal[Json, Map[String, Json]] = json composePrism jObj
 
-  def index(i: Int)     : JsonTraversalPath = JsonTraversalPath(arr composeOptional all.index(i))
+  def index(i: Int): JsonTraversalPath = JsonTraversalPath(arr composeOptional all.index(i))
 
   def selectDynamic(field: String): JsonTraversalPath =
     JsonTraversalPath(obj composeOptional all.index(field))
 
   def each: JsonTraversalPath =
     JsonTraversalPath(json composeTraversal jDescendants)
-}
-```
-
-```scala
-object JsonTraversalPath {
-  val root = JsonTraversalPath(Traversal.id)
 }
 ```
 
@@ -487,7 +533,6 @@ val john = jObj(Map(
 ```
 
 ```tut
-root.each.json.getAll(john)
 root.each.string.getAll(john)
 root.each.string.modify(_.capitalize)(john)
 ```
