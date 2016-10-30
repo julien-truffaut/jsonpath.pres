@@ -1,5 +1,6 @@
 package jsonpath
 
+import monocle.function.Plated
 import monocle.std.double.doubleToInt
 import monocle.{Prism, Traversal}
 
@@ -54,4 +55,9 @@ object Json {
         case _       => Applicative[F].pure(s)
       }
   }
+
+  implicit val platedJson: Plated[Json] = new Plated[Json] {
+    val plate: Traversal[Json, Json] = jDescendants
+  }
+
 }

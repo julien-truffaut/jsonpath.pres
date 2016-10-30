@@ -565,6 +565,20 @@ root.siblings.each.age.int.getAll(john)
 ```
 
 ---
+# out of scope: Plated
+
+```tut:silent
+import monocle.function.Plated
+```
+
+```tut
+Plated.rewrite[Json]{
+  case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
+  case _                            => None
+}(john)
+```
+
+---
 # Available
 
 ```scala
