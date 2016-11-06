@@ -29,7 +29,11 @@ Julien Truffaut • `@JulienTruffaut`
 - notes here
 - see https://remarkjs.com/#1
 ---
-# Tut
+# Project
+
+on github at `julien-truffaut/jsonpath.pres`
+
+### Based on tut
 
 ```tut:book
 2 + 2 
@@ -44,25 +48,51 @@ Julien Truffaut • `@JulienTruffaut`
 - all imports are here, all error messages come from scalac
 
 ---
-# Javascript
+# JSON: JavaScript Object Notation
 
 ```javascript
 var json = {
   "first_name" : "john",
-  "last_name"  : "doe",
-  "age"        : 42
-};
+  "age"  : 42
+  "siblings"   : [
+    {
+      "first_name" : "zoe",
+      "age": 23
+    }
+  ]
+}
+```
 
+--
+
+```javascript
 json.age
-// 10
+// 42
 
-json.age = 10
+json.siblings[0].first_name
+// zoe
+
+json.last_name
+// undefined
+```
+
+---
+# JSON: JavaScript Object Notation
+
+```javascript
+json.age = 25
+json.siblings[0].first_name = "alicia"
 
 json
 //{
 //  "first_name" : "john",
-//  "last_name"  : "doe",
-//  "age"        : 10
+//  "age"  : 25
+//  "siblings"   : [
+//    {
+//      "first_name" : "alicia",
+//      "age": 23
+//    }
+//  ]
 //}
 ```
 
