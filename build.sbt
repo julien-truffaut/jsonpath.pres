@@ -38,9 +38,7 @@ lazy val core = project
   .settings(moduleName := "jsonpath-core")
   .settings(libraryDependencies ++= Seq(
     "org.stanch" %% "reftree"       % "0.7.2",
-    "io.circe"   %% "circe-core"    % circeVersion,
-    "io.circe"   %% "circe-generic" % circeVersion,
-    "io.circe"   %% "circe-parser"  % circeVersion
+    "io.circe"   %% "circe-core"    % circeVersion
   ))
   .settings(baseSettings: _*)
 
