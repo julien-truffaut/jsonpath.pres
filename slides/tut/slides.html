@@ -100,7 +100,10 @@ json
 # Json
 
 ```tut:silent
-sealed trait Json
+sealed trait Json {
+  def asOb: Option[Map[String, Json]] = ???
+  def asInt: Option[Int] = ???
+}
 
 case object JNull extends Json
 case class JBool(v: Boolean) extends Json
@@ -109,6 +112,63 @@ case class JStr(v: String) extends Json
 
 case class JArr(v: List[Json]) extends Json
 case class JObj(v: Map[String, Json]) extends Json
+```
+
+---
+# Json modification
+
+```tut:reset:invisible
+import jsonpath._
+```
+
+```tut:silent
+def incAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+
+val john = JObj(Map(
+  "first_name" -> JStr("john"),
+  "last_name"  -> JStr("doe"),
+  "age"        -> JNum(42)
+))
+```
+
+```tut:book
+incAge(john)
+```
+
+---
+# Json modification: Scala vs JavaScript
+
+```tut:silent
+def incAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```	
+
+```javascript
+json.age = json.age + 1
+```
+	
+---
+# Json
+	      
+`Json` is a `Coproduct` or a `Sum` type
+	      
+```scala
+type Json = JNull | JBool | JNum | JStr | JArr | JObj
+
+type Boolean = True | False
+
+type Option[A] = Some[A] | None
 ```
 
 ---
@@ -156,6 +216,8 @@ doubleToInt.getOption(3.2)
 val jInt: Prism[Json, Int] = jNum composePrism doubleToInt
 ```
 
+--
+
 ```tut:book
 jInt(10)
 jInt.getOption(JNum(3.0))
@@ -187,7 +249,7 @@ val jObj:  Prism[Json, Map[String, Json]]
 import jsonpath.Json._
 ```
 
-```tut:silent
+```tut:book
 val john = jObj(Map(
   "first_name" -> jStr("john"),
   "last_name"  -> jStr("doe"),
@@ -195,6 +257,10 @@ val john = jObj(Map(
 ))
 ```
 
+???
+- Prisms can serve to build json elements and deconstruct it 
+- but what if we want to drill into a JArr or JObj?
+- Prisms cannot zoom into a List or Map because it loses information 
 
 ---
 # Optional
@@ -202,30 +268,36 @@ val john = jObj(Map(
 ```tut:silent
 import monocle.Optional
 
-def headOption[A]: Optional[List[A], A] =
-  Optional[List[A], A](_.headOption)(h => {
-    case Nil     => Nil
-    case _ :: xs => h :: xs
-  })
+def indexL[A](i: Int): Optional[List[A], A] = ???
 
 val xs = List(1, 4, 9)
 ```
 
-```tut:book
-headOption.getOption(xs)
-
-headOption.set(5)(xs)
-headOption.modify((_: Int) + 1)(xs)
-
-headOption.modify((_: Int) + 1)(Nil)
-headOption.modifyOption((_: Int) + 1)(xs)
+```tut:invisible
+import scala.util.Try
+def indexL[A](i: Int) = Optional[List[A], A](
+  l      => if(i < 0) None else l.drop(i).headOption)(
+  a => l => Try(l.updated(i, a)).getOrElse(l)
+)
 ```
 
+```tut:book
+indexL(1).getOption(xs)
+
+indexL(2).set(5)(xs)
+indexL(2).modify((_: Int) + 1)(xs)
+indexL(2).modify((_: Int) + 1)(Nil)
+```
+
+???
+- modify is a noop if it point to nothings	
+- if ypu do care about failure you can you setOption / modifyOption
+	
 ---
-# Optional
+# Index
 
 ```tut:silent
-def index[A](i: Int): Optional[List[A], A] = ???
+def indexL[A](i: Int): Optional[List[A], A] = ???
 ```
 
 --
@@ -248,6 +320,9 @@ implicit def listIndex[A]: Index[List[A], Int, A] = ???
 implicit def mapIndex[K, V]: Index[Map[K, V], K, V] = ???
 ```
 
+???
+- Typeclass to the rescue!
+	
 ---
 # Index
 
@@ -263,11 +338,11 @@ import monocle.std.list._
 ```
 
 ```tut:silent
-jArr                                           : Prism[Json, List[Json]]
+jArr                                            : Prism[Json, List[Json]]
 
-jArr composeOptional index(2)                  : Optional[Json, Json]
+jArr composeOptional index(2)                   : Optional[Json, Json]
 
-jArr composeOptional index(2) composePrism jNum: Optional[Json, Double] 
+jArr composeOptional index(2) composePrism jNum : Optional[Json, Double] 
 
 val array = JArr(List(1,2,3,4,5,6).map(jInt(_)))
 ```
@@ -299,7 +374,7 @@ val john = jObj(Map(
 ```
 
 ---
-# Deep index
+# Deep Index
 
 ```tut:silent
 val john = jObj(Map(
@@ -322,7 +397,7 @@ val zoeAge = jObj.composeOptional(index("siblings")).
 ```
 
 ---
-# Deep index
+# Deep Index
 
 ```tut:silent
 val zoeAge = jObj.composeOptional(index("siblings")).
@@ -338,7 +413,7 @@ zoeAge.modify(_ + 1)(john)
 ```
 
 ---
-# Cut the boiler plate
+# JsonPath DSL
 
 ```tut:silent
 import monocle.function.all
@@ -357,12 +432,19 @@ case class JsonPath(json: Optional[Json, Json]){
 }
 ```
 
+???
+- JsonPath is a builder/factory for optics manipulating json
+- Prisms are useful to distinguish between different type of Json element but any interesting json path would use index, hence the need of Optional	
+- we need a top level json path, something that matches all Json: Optional.id
+- for those interested, all optics form a Category using compose and id	
+--
+
 ```scala
 val root = JsonPath(Optional.id)
 ```
 
 ---
-# JsonPath
+# JsonPath DSL
 
 ```tut:reset:invisible
 import monocle._
@@ -395,6 +477,9 @@ root.index("first_name").string.getOption(john)
 ```tut
 root.index("siblings").index(0).index("age").int.set(55)(john)
 ```
+
+???
+- it is nice but index is quite verbose, it would be much nicer if we could use a syntax like javascript, e.g. root.siblings instead of root.index("siblings")
 
 ---
 # Dynamic
@@ -474,21 +559,33 @@ root.foo.bar.json.getOption(john)
 ```
 
 ---
+# Optics
+	
+.center[![optics_today](optics_today.png)]
+
+	
+---
 # Traversal
 
 ```tut:silent
-import monocle.PTraversal
-import scalaz.std.list._
+import monocle.Traversal
 
-def each[A]: Traversal[List[A], A] = PTraversal.fromTraverse[List, A, A]
+def eachL[A]: Traversal[List[A], A] = ???
 
 val xs = List(1,2,3,4)
 ```
+	
+```tut:invisible
+import monocle.PTraversal
+import scalaz.std.list._
+
+def eachL[A]: Traversal[List[A], A] = PTraversal.fromTraverse[List, A, A]
+```
 
 ```tut
-each[Int].getAll(xs)
-each[Int].set(0)(xs)
-each[Int].modify(_ + 1)(xs)
+eachL[Int].getAll(xs)
+eachL[Int].set(0)(xs)
+eachL[Int].modify(_ + 1)(xs)
 ```
 
 ---
@@ -541,16 +638,18 @@ jDescendants.set(jInt(1))(jStr("Hello"))
 import monocle.function.all
 import scala.language.dynamics
 
-case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
-  def `null` : Traversal[Json, Unit]       = json composePrism jNull
-  def boolean: Traversal[Json, Boolean]    = json composePrism jBool
-  def int    : Traversal[Json, Int]        = json composePrism jInt
-  def double : Traversal[Json, Double]     = json composePrism jNum
-  def string : Traversal[Json, String]     = json composePrism jStr
-  def arr    : Traversal[Json, List[Json]] = json composePrism jArr
-  def obj    : Traversal[Json, Map[String, Json]] = json composePrism jObj
+case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
+  def obj: Optional[Json, Map[String, Json]] = json composePrism jObj
 
-  def index(i: Int): JsonTraversalPath = JsonTraversalPath(arr composeOptional all.index(i))
+  def selectDynamic(field: String): JsonPath =
+    JsonPath(obj composeOptional all.index(field))
+
+  def each: JsonTraversalPath =
+    JsonTraversalPath(json composeTraversal jDescendants)
+}
+
+case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
+  def obj: Traversal[Json, Map[String, Json]] = json composePrism jObj
 
   def selectDynamic(field: String): JsonTraversalPath =
     JsonTraversalPath(obj composeOptional all.index(field))

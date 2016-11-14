@@ -11,6 +11,10 @@ import scalaz.std.map._
 import scalaz.syntax.traverse._
 
 sealed trait Json {
+  def asObj: Option[Map[String, Json]] = Json.jObj.getOption(this)
+  def asArray: Option[List[Json]] = Json.jArr.getOption(this)
+  def asInt: Option[Int] = Json.jInt.getOption(this)
+
   override def toString: String = toString(1)
 
   def toString(depth: Int): String =
