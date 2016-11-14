@@ -197,7 +197,7 @@ def isNum(json: Json): Boolean = json match {
 ```
 
 ---
-# Safe cast
+# Prism safe cast
 
 ```tut:silent
 import monocle.std.double.doubleToInt
@@ -561,60 +561,15 @@ root.foo.bar.json.getOption(john)
 ---
 # Optics
 	
-.center[![optics_today](optics_today.png)]
+.center[![prism-optional](prism-optional.png)]
 
+---
+# Optics
 	
+.center[![prism-traversal](prism-traversal.png)]
+	    
 ---
-# Traversal
-
-```tut:silent
-import monocle.Traversal
-
-def eachL[A]: Traversal[List[A], A] = ???
-
-val xs = List(1,2,3,4)
-```
-	
-```tut:invisible
-import monocle.PTraversal
-import scalaz.std.list._
-
-def eachL[A]: Traversal[List[A], A] = PTraversal.fromTraverse[List, A, A]
-```
-
-```tut
-eachL[Int].getAll(xs)
-eachL[Int].set(0)(xs)
-eachL[Int].modify(_ + 1)(xs)
-```
-
----
-# Traversal
-
-```tut:silent
-def eachL[A]: Traversal[List[A], A] = ???
-
-def eachV[A]: Traversal[Vector[A], A] = ???
-
-def eachM[K, V]: Traversal[Map[K, V], V] = ???
-```
-
---
-
-```tut:silent
-trait Each[S, A]{
-  def each: Traversal[S, A]
-}
-
-implicit def eachList[A]: Each[List[A], A] = ???
-
-implicit def eachVector[A]: Each[Vector[A], A] = ???
-
-implicit def eachMap[K, V]: Each[Map[K, V], V] = ???
-```
-
----
-# Json Array / Object descendants
+# Traversal for Json Array / Object
 
 ```scala
 val jDescendants: Traversal[Json, Json] = ???
@@ -625,7 +580,7 @@ val arr = jArr(List(jInt(1), jInt(2), jInt(3)))
 val obj = jObj(Map("name" -> jStr("john"), "age" -> jInt(23)))
 ```
 
-```tut
+```tut:book
 jDescendants.set(jInt(1))(arr)
 jDescendants.set(jInt(1))(obj)
 jDescendants.set(jInt(1))(jStr("Hello"))
@@ -660,7 +615,7 @@ case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
 ```
 
 ---
-# JsonPathTraversal
+# JsonTraversalPath
 
 ```tut:reset:invisible
 import monocle._
@@ -669,28 +624,23 @@ import monocle.std.map._
 import jsonpath._
 import jsonpath.Json._
 import jsonpath.JsonPath.root
-
+```
+	    
+```tut:silent
 val john = jObj(Map(
   "first_name" -> jStr("john"),
   "last_name"  -> jStr("doe"),
-  "age"        -> jInt(42),
-  "siblings"   -> jArr(List(
-    jObj(Map(
-      "first_name" -> jStr("zoe"),
-      "last_name"  -> jStr("doe"),
-      "age"        -> jInt(28)
-      ))
-   ))
+  "age"        -> jInt(42)
 ))
 ```
 
-```tut
+```tut:book
 root.each.string.getAll(john)
 root.each.string.modify(_.capitalize)(john)
 ```
 
 ---
-# JsonPathTraversal
+# JsonTraversalPath
 
 ```tut:silent
 val john = jObj(Map(
@@ -712,31 +662,34 @@ val john = jObj(Map(
 ))
 ```
 
-```tut
+```tut:book
 root.siblings.each.age.int.getAll(john)
 ```
 
 ---
-# out of scope: Plated
+# Give me more POOOWWWER
 
 ```tut:silent
 import monocle.function.Plated
+
+def capitalizeEverywhere(json: Json): Json =
+  Plated.rewrite[Json]{
+    case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
+    case _                            => None
+  }(json)
 ```
 
-```tut
-Plated.rewrite[Json]{
-  case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
-  case _                            => None
-}(john)
-```
+```tut:book
+capitalizeEverywhere(john)
+``` 
 
 ---
-# Available
+# Available today
 
 ```scala
-"io.argonaut"          %% "argonaut-monocle" % "6.2-M3" // since 6.2-M2
-"io.circe"             %% "circe-optics"     % "0.5.4"  // sunce 0.5.0
-"com.github.stacycurl" %% "pimpathon"        % "1.7.6"  // since ???
+"io.argonaut"          %% "argonaut-monocle" % "6.2-RC1" // since 6.2-M2
+"io.circe"             %% "circe-optics"     % "0.6.0"  // sunce 0.5.0
+"com.github.stacycurl" %% "pimpathon"        % "1.8.0"  // since 1.7.0
 ```
 
 ---
