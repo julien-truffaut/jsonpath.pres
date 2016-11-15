@@ -684,12 +684,48 @@ capitalizeEverywhere(john)
 ``` 
 
 ---
+# Another approach: Pimpathon
+
+```tut:reset:invisible
+import argonaut.Json._
+val john = obj(
+  "first_name" -> jString("john"),
+  "last_name"  -> jString("doe"),
+  "age"        -> jNumber(42),
+  "siblings"   -> jArray(List(
+    obj(
+      "first_name" -> jString("zoe"),
+      "last_name"  -> jString("doe"),
+      "age"        -> jNumber(28)
+    ),
+    obj(
+      "first_name" -> jString("dan"),
+      "last_name"  -> jString("doe"),
+      "age"        -> jNumber(24)
+    )
+  ))
+)
+```
+	    
+```tut:silent
+import pimpathon.argonaut.JsonFrills
+```
+
+```tut:book
+john.descendant("siblings/*/age").int.modify(_ + 1).spaces2
+```
+--
+```tut:silent
+john.descendant("siblings/*").renameField("last_name", "family_name")
+```
+
+---
 # Available today
 
 ```scala
 "io.argonaut"          %% "argonaut-monocle" % "6.2-RC1" // since 6.2-M2
-"io.circe"             %% "circe-optics"     % "0.6.0"  // sunce 0.5.0
-"com.github.stacycurl" %% "pimpathon"        % "1.8.0"  // since 1.7.0
+"io.circe"             %% "circe-optics"     % "0.6.0"   // since 0.5.0
+"com.github.stacycurl" %% "pimpathon"        % "1.8.0"   // since 1.7.0
 ```
 
 ---

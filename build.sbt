@@ -1,5 +1,5 @@
 lazy val baseSettings: Seq[Setting[_]] = Seq(
-  scalaVersion       := "2.11.8",
+  scalaVersion       := "2.12.0",
   scalacOptions     ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -15,18 +15,17 @@ lazy val baseSettings: Seq[Setting[_]] = Seq(
     "-Xfuture"
   ),
   libraryDependencies ++= Seq(
-    "com.github.julien-truffaut"  %%  "monocle-core"    % monocleVersion,
-    "com.github.julien-truffaut"  %%  "monocle-macro"   % monocleVersion
+    "com.github.julien-truffaut"  %% "monocle-core"     % "1.3.2",
+    "com.github.julien-truffaut"  %% "monocle-macro"    % "1.3.2",
+    "io.argonaut"                 %% "argonaut-monocle" % "6.2-RC1",
+    "io.gatling"                  %% "jsonpath"         % "0.6.8",
+    "com.github.stacycurl"        %% "pimpathon"        % "1.8.0"
   ),
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
-    Resolver.bintrayRepo("stanch", "maven"),
-    Resolver.bintrayRepo("drdozer", "maven")
+    "Stacy Curl's repo" at "http://dl.bintray.com/stacycurl/repo/"
   )
 )
-
-lazy val circeVersion = "0.5.4"
-lazy val monocleVersion = "1.3.1"
 
 lazy val jsonpath = project.in(file("."))
   .settings(moduleName := "jsonpath")
@@ -36,12 +35,7 @@ lazy val jsonpath = project.in(file("."))
 
 lazy val core = project
   .settings(moduleName := "jsonpath-core")
-  .settings(libraryDependencies ++= Seq(
-    "org.stanch" %% "reftree"       % "0.7.2",
-    "io.circe"   %% "circe-core"    % circeVersion
-  ))
   .settings(baseSettings: _*)
-
 
 lazy val slides = project
   .settings(moduleName := "jsonpath-slides")
