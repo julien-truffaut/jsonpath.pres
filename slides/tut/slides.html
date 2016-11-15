@@ -31,9 +31,9 @@ Julien Truffaut • `@JulienTruffaut`
 ---
 # Project
 
-on github at `julien-truffaut/jsonpath.pres`
+Available on github at `julien-truffaut/jsonpath.pres`
 
-### Based on tut
+### Using tut for all scala code
 
 ```tut:book
 2 + 2 
@@ -69,11 +69,11 @@ var json = {
 json.age
 // 42
 
-json.siblings[0].first_name
-// zoe
-
 json.last_name
 // undefined
+
+json.siblings[0].first_name
+// zoe
 ```
 
 ---
@@ -97,13 +97,10 @@ json
 ```
 
 ---
-# Json
+# Enconding Json in Sacala
 
 ```tut:silent
-sealed trait Json {
-  def asOb: Option[Map[String, Json]] = ???
-  def asInt: Option[Int] = ???
-}
+sealed trait Json
 
 case object JNull extends Json
 case class JBool(v: Boolean) extends Json
@@ -117,6 +114,13 @@ case class JObj(v: Map[String, Json]) extends Json
 ---
 # Json modification
 
+```tut:silent
+sealed trait Json {
+  def asOb: Option[Map[String, Json]] = ???
+  def asInt: Option[Int] = ???
+}
+```
+
 ```tut:reset:invisible
 import jsonpath._
 ```
@@ -129,7 +133,21 @@ def incAge(json: Json): Option[Json] =
     ageInt <- age.asInt
     newAge  = ageInt + 1			
   } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```
 
+---
+# Json modification
+
+	      
+```tut:silent
+def incAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+	      
 val john = JObj(Map(
   "first_name" -> JStr("john"),
   "last_name"  -> JStr("doe"),
@@ -233,7 +251,7 @@ def isEven(json: Json): Boolean = json match {
 ```
 
 ---
-# Prisms
+# Json Prisms
 
 ```scala
 val jNull: Prism[Json, Unit]
@@ -246,7 +264,9 @@ val jObj:  Prism[Json, Map[String, Json]]
 ```
 
 ```tut:reset:invisible
+import jsonpath.Json
 import jsonpath.Json._
+import monocle.Prism	
 ```
 
 ```tut:book
@@ -262,6 +282,26 @@ val john = jObj(Map(
 - but what if we want to drill into a JArr or JObj?
 - Prisms cannot zoom into a List or Map because it loses information 
 
+---
+# How to drill into a Json array or object?
+
+```tut:silent
+def indexJArr(i: Int): Prism[List[Json], Json] = ???
+	
+def indexJObj(field: String): Prism[Map[String, Json], Json] = ???
+
+def age: Prism[Json, Int] =
+  jObj composePrism indexJObj("age") composePrism jInt
+```
+
+--
+	
+```scala
+age.getOption(john) // Some(42)
+
+age(5) ???
+```
+	
 ---
 # Optional
 
@@ -367,14 +407,14 @@ val john = jObj(Map(
 ))
 ```
 
-```tut
+```tut:book
 (jObj composeOptional index("first_name")).getOption(john)
 
 (jObj composeOptional index("age") composePrism jNum).modify(_ + 1)(john)
 ```
 
 ---
-# Deep Index
+# Deep indexing
 
 ```tut:silent
 val john = jObj(Map(
@@ -397,7 +437,7 @@ val zoeAge = jObj.composeOptional(index("siblings")).
 ```
 
 ---
-# Deep Index
+# Deep indexing
 
 ```tut:silent
 val zoeAge = jObj.composeOptional(index("siblings")).
@@ -406,7 +446,7 @@ val zoeAge = jObj.composeOptional(index("siblings")).
     composePrism(jInt)
 ```
 
-```tut
+```tut:book
 zoeAge.getOption(john)
 
 zoeAge.modify(_ + 1)(john)
@@ -468,13 +508,13 @@ val john = jObj(Map(
 ))
 ```
 
-```tut
+```tut:book
 root.index("first_name").json.getOption(john)
 root.index("first_name").string.getOption(john)
 ```
 --
 
-```tut
+```tut:book
 root.index("siblings").index(0).index("age").int.set(55)(john)
 ```
 
@@ -548,13 +588,13 @@ val john = jObj(Map(
 ))
 ```
 
-```tut
+```tut:book
 root.first_name.json.getOption(john)
 root.siblings.index(0).age.int.set(55)(john)
 ```
 --
 
-```tut
+```tut:book
 root.foo.bar.json.getOption(john)
 ```
 
@@ -569,7 +609,7 @@ root.foo.bar.json.getOption(john)
 .center[![prism-traversal](prism-traversal.png)]
 	    
 ---
-# Traversal for Json Array / Object
+# Traversal for Json array or object
 
 ```scala
 val jDescendants: Traversal[Json, Json] = ???
@@ -665,27 +705,11 @@ val john = jObj(Map(
 ```tut:book
 root.siblings.each.age.int.getAll(john)
 ```
-
----
-# Give me more POOOWWWER
-
-```tut:silent
-import monocle.function.Plated
-
-def capitalizeEverywhere(json: Json): Json =
-  Plated.rewrite[Json]{
-    case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
-    case _                            => None
-  }(json)
-```
-
-```tut:book
-capitalizeEverywhere(john)
-``` 
-
 ---
 # Another approach: Pimpathon
 
+--
+	    
 ```tut:reset:invisible
 import argonaut.Json._
 val john = obj(
@@ -712,21 +736,65 @@ import pimpathon.argonaut.JsonFrills
 ```
 
 ```tut:book
-john.descendant("siblings/*/age").int.modify(_ + 1).spaces2
+john.descendant("/siblings/*/age").int.modify(_ + 1).spaces2
 ```
 --
 ```tut:silent
-john.descendant("siblings/*").renameField("last_name", "family_name")
+john.descendant("/siblings/*").renameField("last_name", "family_name")
 ```
 
 ---
 # Available today
 
+### JsonPath & JsonTraversalPath
 ```scala
 "io.argonaut"          %% "argonaut-monocle" % "6.2-RC1" // since 6.2-M2
 "io.circe"             %% "circe-optics"     % "0.6.0"   // since 0.5.0
+```
+
+### String base JsonPath
+```scala
 "com.github.stacycurl" %% "pimpathon"        % "1.8.0"   // since 1.7.0
 ```
+
+---
+# Give me more POOOWWWER
+
+```tut:reset:invisible
+import jsonpath.Json
+import jsonpath.Json._
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+    )),
+    jObj(Map(
+      "first_name" -> jStr("dan"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(24)
+    ))
+  ))
+))
+```
+	  
+```tut:silent
+import monocle.function.Plated
+
+def capitalizeEverywhere(json: Json): Json =
+  Plated.rewrite[Json]{
+    case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
+    case _                            => None
+  }(json)
+```
+
+```tut:book
+capitalizeEverywhere(john)
+``` 
 
 ---
 class: center, middle
