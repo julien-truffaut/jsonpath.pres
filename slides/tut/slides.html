@@ -96,8 +96,13 @@ json
 //}
 ```
 
+???
+- How to improve JSON API:
+- use type to prevent undefined
+- immutablility
+
 ---
-# Enconding Json in Sacala
+# Enconding Json in Scala
 
 ```tut:silent
 sealed trait Json
@@ -111,12 +116,16 @@ case class JArr(v: List[Json]) extends Json
 case class JObj(v: Map[String, Json]) extends Json
 ```
 
+???
+- recursive data type like a tree
+- 4 leafs: null, bool, num, str
+- 2 forks: obj indexed by string, arr indexed by int 
 ---
 # Json modification
 
 ```tut:silent
 sealed trait Json {
-  def asOb: Option[Map[String, Json]] = ???
+  def asObj: Option[Map[String, Json]] = ???
   def asInt: Option[Int] = ???
 }
 ```
@@ -217,6 +226,12 @@ def isNum(json: Json): Boolean = json match {
 ---
 # Prism safe cast
 
+```scala
+type Double = Int | (Double - Int)
+```
+
+--
+
 ```tut:silent
 import monocle.std.double.doubleToInt
 ```
@@ -282,99 +297,42 @@ val john = jObj(Map(
 - but what if we want to drill into a JArr or JObj?
 - Prisms cannot zoom into a List or Map because it loses information 
 
----
-# How to drill into a Json array or object?
 
-```tut:silent
-def indexJArr(i: Int): Prism[List[Json], Json] = ???
-	
-def indexJObj(field: String): Prism[Map[String, Json], Json] = ???
-
-def age: Prism[Json, Int] =
-  jObj composePrism indexJObj("age") composePrism jInt
-```
-
---
-	
-```scala
-age.getOption(john) // Some(42)
-
-age(5) ???
-```
-	
 ---
 # Optional
 
 ```tut:silent
 import monocle.Optional
+import monocle.std.list._
 
-def indexL[A](i: Int): Optional[List[A], A] = ???
+def indexL[A](i: Int): Optional[List[A], A] =
+  monocle.function.all.index(i)
 
 val xs = List(1, 4, 9)
 ```
 
-```tut:invisible
-import scala.util.Try
-def indexL[A](i: Int) = Optional[List[A], A](
-  l      => if(i < 0) None else l.drop(i).headOption)(
-  a => l => Try(l.updated(i, a)).getOrElse(l)
-)
-```
-
 ```tut:book
-indexL(1).getOption(xs)
+indexL(2).getOption(xs)
 
 indexL(2).set(5)(xs)
 indexL(2).modify((_: Int) + 1)(xs)
-indexL(2).modify((_: Int) + 1)(Nil)
+indexL(2).modify((_: Int) + 1)(List(1))
 ```
 
 ???
 - modify is a noop if it point to nothings	
 - if ypu do care about failure you can you setOption / modifyOption
+
+---
+# Prism - Optional
+	
+.center[![prism-optional](prism-optional.png)]
 	
 ---
-# Index
+# Index json array
 
 ```tut:silent
-def indexL[A](i: Int): Optional[List[A], A] = ???
-```
-
---
-
-```tut:silent
-def indexV[A](i: Int): Optional[Vector[A], A] = ???
-
-def indexM[K, V](k: K): Optional[Map[K, V], V] = ???
-```
-
---
-
-```tut:silent
-trait Index[S, I, A]{
-  def index(i: I): Optional[S, A]
-}
-
-implicit def listIndex[A]: Index[List[A], Int, A] = ???
-
-implicit def mapIndex[K, V]: Index[Map[K, V], K, V] = ???
-```
-
-???
-- Typeclass to the rescue!
-	
----
-# Index
-
-```tut:reset:invisible
-import jsonpath._
-import jsonpath.Json._
-import monocle.{Prism, Optional}
-```
-
-```tut:silent
-import monocle.function.all._
-import monocle.std.list._
+import monocle.function.all.index
 ```
 
 ```tut:silent
@@ -384,18 +342,18 @@ jArr composeOptional index(2)                   : Optional[Json, Json]
 
 jArr composeOptional index(2) composePrism jNum : Optional[Json, Double] 
 
-val array = JArr(List(1,2,3,4,5,6).map(jInt(_)))
+val array = jArr(List(1,2,3,4,5,6).map(jInt(_)))
 ```
 
 
 ```tut:book
 (jArr composeOptional index(2)).getOption(array)
 
-(jArr composeOptional index(2) composePrism jNum).modify(_ + 10)(array)
+(jArr composeOptional index(2) composePrism jInt).modify(_ + 10)(array)
 ```
 
 ---
-# Index
+# Index json object
 
 ```tut:silent
 import monocle.std.map._
@@ -409,8 +367,27 @@ val john = jObj(Map(
 
 ```tut:book
 (jObj composeOptional index("first_name")).getOption(john)
+```
 
-(jObj composeOptional index("age") composePrism jNum).modify(_ + 1)(john)
+---
+# Compare json and optics API
+
+```tut:invisible
+import jsonpath._
+```
+	
+```tut:silent
+def incAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```
+
+```tut:book
+(jObj composeOptional index("age") composePrism jInt).modify(_ + 1)(john)
 ```
 
 ---
@@ -452,6 +429,20 @@ zoeAge.getOption(john)
 zoeAge.modify(_ + 1)(john)
 ```
 
+---
+# Compare JavaScript and optics API
+
+```tut:silent
+jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt).set(25)(john)
+```
+	  
+```javascript
+john.siblings[0].age = 25
+```
+	  
 ---
 # JsonPath DSL
 
@@ -589,7 +580,6 @@ val john = jObj(Map(
 ```
 
 ```tut:book
-root.first_name.json.getOption(john)
 root.siblings.index(0).age.int.set(55)(john)
 ```
 --
@@ -634,8 +624,9 @@ import monocle.function.all
 import scala.language.dynamics
 
 case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
+  //...
   def obj: Optional[Json, Map[String, Json]] = json composePrism jObj
-
+	  
   def selectDynamic(field: String): JsonPath =
     JsonPath(obj composeOptional all.index(field))
 
@@ -644,13 +635,8 @@ case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
 }
 
 case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
-  def obj: Traversal[Json, Map[String, Json]] = json composePrism jObj
-
-  def selectDynamic(field: String): JsonTraversalPath =
-    JsonTraversalPath(obj composeOptional all.index(field))
-
-  def each: JsonTraversalPath =
-    JsonTraversalPath(json composeTraversal jDescendants)
+  //...	  
+  def selectDynamic(field: String): JsonTraversalPath = ???
 }
 ```
 
