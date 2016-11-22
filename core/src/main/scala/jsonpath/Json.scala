@@ -4,7 +4,6 @@ import monocle.function.Plated
 import monocle.std.double.doubleToInt
 import monocle.{Prism, Traversal}
 
-import scala.util.Try
 import scalaz.Applicative
 import scalaz.std.list._
 import scalaz.std.map._
@@ -21,7 +20,7 @@ sealed trait Json {
     this match {
     case JNull    => "null"
     case JBool(v) => v.toString
-    case JNum(v)  => Try(v.toLong.toString).getOrElse(v.toString)
+    case JNum(v)  => if(v.isValidInt) v.toInt.toString else v.toString
     case JStr(v)  => "\"" + v.toString + "\""
     case JArr(v)  => v.map(_.toString(depth)).mkString("[", ", ", "]")
     case JObj(vs) =>

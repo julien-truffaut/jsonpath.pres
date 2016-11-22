@@ -51,13 +51,13 @@ Available on github at `julien-truffaut/jsonpath.pres`
 # JSON: JavaScript Object Notation
 
 ```javascript
-var json = {
+var john = {
   "first_name" : "john",
-  "age"  : 42
+  "age"        : 42
   "siblings"   : [
     {
       "first_name" : "zoe",
-      "age": 23
+      "age"        : 23
     }
   ]
 }
@@ -66,31 +66,31 @@ var json = {
 --
 
 ```javascript
-json.age
+john.age
 // 42
 
-json.last_name
-// undefined
-
-json.siblings[0].first_name
+john.siblings[0].first_name
 // zoe
+
+john.last_name
+// undefined
 ```
 
 ---
 # JSON: JavaScript Object Notation
 
 ```javascript
-json.age = 25
-json.siblings[0].first_name = "alicia"
+john.age = 25
+john.siblings[0].first_name = "alicia"
 
-json
+john
 //{
 //  "first_name" : "john",
-//  "age"  : 25
+//  "age"        : 25
 //  "siblings"   : [
 //    {
 //      "first_name" : "alicia",
-//      "age": 23
+//      "age"        : 23
 //    }
 //  ]
 //}
@@ -345,10 +345,7 @@ jArr composeOptional index(2) composePrism jNum : Optional[Json, Double]
 val array = jArr(List(1,2,3,4,5,6).map(jInt(_)))
 ```
 
-
 ```tut:book
-(jArr composeOptional index(2)).getOption(array)
-
 (jArr composeOptional index(2) composePrism jInt).modify(_ + 10)(array)
 ```
 
@@ -500,7 +497,6 @@ val john = jObj(Map(
 ```
 
 ```tut:book
-root.index("first_name").json.getOption(john)
 root.index("first_name").string.getOption(john)
 ```
 --
@@ -744,6 +740,14 @@ john.descendant("/siblings/*").renameField("last_name", "family_name")
 ```
 
 ---
+class: center, middle
+
+# Thanks!
+Code and slides at `julien-truffaut/jsonpath.pres` on GitHub
+
+## Questions?
+
+---
 # Give me more POOOWWWER
 
 ```tut:reset:invisible
@@ -781,15 +785,6 @@ def capitalizeEverywhere(json: Json): Json =
 ```tut:book
 capitalizeEverywhere(john)
 ``` 
-
----
-class: center, middle
-
-# Thanks!
-Code and slides at `julien-truffaut/jsonpath.pres` on GitHub
-
-## Questions?
-
 
 
 
