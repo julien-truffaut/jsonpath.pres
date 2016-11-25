@@ -718,11 +718,11 @@ import pimpathon.argonaut.JsonFrills
 ```
 
 ```tut:book
-john.descendant("/siblings/*/age").int.modify(_ + 1).spaces2
+john.descendant("$.siblings[*].age").int.modify(_ + 1).spaces2
 ```
 --
 ```tut:silent
-john.descendant("/siblings/*").renameField("last_name", "family_name")
+john.descendant("$.siblings[*]").renameField("last_name", "family_name")
 ```
 
 ---
