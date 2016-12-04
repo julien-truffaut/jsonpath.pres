@@ -135,7 +135,7 @@ import jsonpath._
 ```
 
 ```tut:silent
-def incAge(json: Json): Option[Json] =
+def incrementAge(json: Json): Option[Json] =
   for {
     obj    <- json.asObj
     age    <- obj.get("age")
@@ -149,7 +149,7 @@ def incAge(json: Json): Option[Json] =
 
 	      
 ```tut:silent
-def incAge(json: Json): Option[Json] =
+def incrementAge(json: Json): Option[Json] =
   for {
     obj    <- json.asObj
     age    <- obj.get("age")
@@ -165,14 +165,14 @@ val john = JObj(Map(
 ```
 
 ```tut:book
-incAge(john)
+incrementAge(john)
 ```
 
 ---
 # Json modification: Scala vs JavaScript
 
 ```tut:silent
-def incAge(json: Json): Option[Json] =
+def incrementAge(json: Json): Option[Json] =
   for {
     obj    <- json.asObj
     age    <- obj.get("age")
@@ -374,7 +374,7 @@ import jsonpath._
 ```
 	
 ```tut:silent
-def incAge(json: Json): Option[Json] =
+def incrementAge(json: Json): Option[Json] =
   for {
     obj    <- json.asObj
     age    <- obj.get("age")
@@ -525,6 +525,7 @@ val foo = new Foo
 ```tut:book
 foo.bar
 foo.hello
+foo.selectDynamic("hello")
 ```
 
 ---
@@ -720,9 +721,12 @@ import pimpathon.argonaut.JsonFrills
 ```tut:book
 john.descendant("$.siblings[*].age").int.modify(_ + 1).spaces2
 ```
---
-```tut:silent
-john.descendant("$.siblings[*]").renameField("last_name", "family_name")
+
+---
+# Another approach: Pimpathon
+
+```tut:book
+john.descendant("$.siblings[*]").renameField("last_name", "family_name").spaces2
 ```
 
 ---
@@ -745,13 +749,11 @@ class: center, middle
 # Thanks!
 Code and slides at `julien-truffaut/jsonpath.pres` on GitHub
 
-## Questions?
-
 ---
 background-image: url(Monocle.png)
 
 # Stickers
-
+	  
 ---
 	  
 # References
