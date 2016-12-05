@@ -468,7 +468,9 @@ case class JsonPath(json: Optional[Json, Json]){
 --
 
 ```scala
-val root = JsonPath(Optional.id)
+object JsonPath {	  
+  val root = JsonPath(Optional.id)
+}
 ```
 
 ---
@@ -480,7 +482,6 @@ import monocle.std.list._
 import monocle.std.map._
 import jsonpath._
 import jsonpath.Json._
-import jsonpath.JsonPath.root
 
 val john = jObj(Map(
   "first_name" -> jStr("john"),
@@ -496,6 +497,10 @@ val john = jObj(Map(
 ))
 ```
 
+```tut:silent
+import jsonpath.JsonPath.root
+```
+	  
 ```tut:book
 root.index("first_name").string.getOption(john)
 ```
