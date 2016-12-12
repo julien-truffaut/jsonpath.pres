@@ -41,7 +41,14 @@ lazy val slides = project
   .settings(moduleName := "jsonpath-slides")
   .settings(baseSettings: _*)
   .settings(tutSettings: _*)
+  .settings(ghpages.settings: _*)
   .settings(
     tutSourceDirectory := baseDirectory.value / "tut",
-    tutTargetDirectory := baseDirectory.value / "tut-out"
+    tutTargetDirectory := baseDirectory.value / "tut-out",
+    siteSourceDirectory := tutTargetDirectory.value,
+    siteMappings ++= Seq(tutTargetDirectory.value / "slides.html" -> "index.html"),
+    git.remoteRepo := "git@github.com:julien-truffaut/jsonpath.pres",
+    updateSite := Def.sequential(tut, GhPagesKeys.pushSite).value
   ).dependsOn(core)
+
+lazy val updateSite = taskKey[Unit]("")
