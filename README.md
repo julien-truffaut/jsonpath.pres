@@ -1,5 +1,7 @@
 # JsonPath: Type safe query DSL using optics
 
+Slides are published at https://julien-truffaut.github.io/jsonpath.pres
+
 Raw slides are in `slides/tut/slides.html`
 
 run `sbt slides/tut` to compile slides using [tut][tut] at `slides/tut-out/slides.html`
