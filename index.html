@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>JsonPath: Type safe query DSL using optics</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif', 'Helvetica'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz', 'Gill Sans';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+
+class: center, middle
+
+# JsonPath: Type safe query DSL using optics
+Julien Truffaut
+
+???
+- notes here
+- see https://remarkjs.com/#1
+---
+# Project
+
+Available on github at `julien-truffaut/jsonpath.pres`
+
+### Using tut for all scala code
+
+```scala
+2 + 2 
+// res0: Int = 4
+```
+
+```scala
+scala> "Hello World".foo
+<console>:13: error: value foo is not a member of String
+       "Hello World".foo
+                     ^
+```
+
+???
+- all the code in the slides are compiled using tut
+- all imports are here, all error messages come from scalac
+
+---
+# JSON: JavaScript Object Notation
+
+```javascript
+var john = {
+  "first_name" : "john",
+  "age"        : 42,
+  "siblings"   : [
+    {
+      "first_name" : "zoe",
+      "age"        : 23
+    }
+  ]
+}
+```
+
+--
+
+```javascript
+john.age
+// 42
+
+john.siblings[0].first_name
+// zoe
+
+john.last_name
+// undefined
+```
+
+---
+# JSON: JavaScript Object Notation
+
+```javascript
+john.age = 25
+john.siblings[0].first_name = "alicia"
+
+john
+//{
+//  "first_name" : "john",
+//  "age"        : 25,
+//  "siblings"   : [
+//    {
+//      "first_name" : "alicia",
+//      "age"        : 23
+//    }
+//  ]
+//}
+```
+
+???
+- How to improve JSON API:
+- use type to prevent undefined
+- immutablility
+
+---
+# Enconding Json in Scala
+
+```scala
+sealed trait Json
+
+case object JNull extends Json
+case class JBool(v: Boolean) extends Json
+case class JNum(v: Double) extends Json
+case class JStr(v: String) extends Json
+
+case class JArr(v: List[Json]) extends Json
+case class JObj(v: Map[String, Json]) extends Json
+```
+
+???
+- recursive data type like a tree
+- 4 leafs: null, bool, num, str
+- 2 forks: obj indexed by string, arr indexed by int 
+---
+# Json modification
+
+```scala
+sealed trait Json {
+  def asObj: Option[Map[String, Json]] = ???
+  def asInt: Option[Int] = ???
+}
+```
+
+
+
+
+```scala
+def incrementAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```
+
+---
+# Json modification
+
+	      
+```scala
+def incrementAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+	      
+val john = JObj(Map(
+  "first_name" -> JStr("john"),
+  "last_name"  -> JStr("doe"),
+  "age"        -> JNum(42)
+))
+```
+
+```scala
+incrementAge(john)
+// res1: Option[jsonpath.Json] =
+// Some({
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 43
+// })
+```
+
+---
+# Json modification: Scala vs JavaScript
+
+```scala
+def incrementAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```	
+
+```javascript
+json.age = json.age + 1
+```
+	
+---
+# Json
+	      
+`Json` is a `Coproduct` or a `Sum` type
+	      
+```scala
+type Json = JNull | JBool | JNum | JStr | JArr | JObj
+
+type Boolean = True | False
+
+type Option[A] = Some[A] | None
+```
+
+---
+# Prism
+
+```scala
+import monocle.Prism
+
+val jNum = Prism.partial[Json, Double]{case JNum(v) => v}(JNum)
+```
+
+```scala
+jNum(12.2)
+// res3: jsonpath.Json = 12.2
+
+jNum.getOption(JNum(4.5))
+// res4: Option[Double] = Some(4.5)
+
+jNum.getOption(JStr("Hello"))
+// res5: Option[Double] = None
+```
+
+--
+
+```scala
+def isNum(json: Json): Boolean = json match {
+  case jNum(n) => true
+  case other   => false
+}
+```
+
+---
+# Prism safe cast
+
+```scala
+type Double = Int | (Double - Int)
+```
+
+--
+
+```scala
+import monocle.std.double.doubleToInt
+```
+
+```scala
+doubleToInt(5)
+// res6: Double = 5.0
+
+doubleToInt.getOption(3.0)
+// res7: Option[Int] = Some(3)
+
+doubleToInt.getOption(3.2)
+// res8: Option[Int] = None
+```
+
+---
+# Prism composition
+
+```scala
+val jInt: Prism[Json, Int] = jNum composePrism doubleToInt
+```
+
+--
+
+```scala
+jInt(10)
+// res9: jsonpath.Json = 10
+
+jInt.getOption(JNum(3.0))
+// res10: Option[Int] = Some(3)
+
+jInt.getOption(JNum(3.2))
+// res11: Option[Int] = None
+
+jInt.getOption(JStr("Hello"))
+// res12: Option[Int] = None
+```
+
+```scala
+def isEven(json: Json): Boolean = json match {
+  case jInt(n) => n % 2 == 0
+  case other   => false
+}
+```
+
+---
+# Json Prisms
+
+```scala
+val jNull: Prism[Json, Unit]
+val jBool: Prism[Json, Boolean]
+val jNum:  Prism[Json, Double]
+val jInt:  Prism[Json, Int]
+val jStr:  Prism[Json, String]
+val jArr:  Prism[Json, List[Json]]
+val jObj:  Prism[Json, Map[String, Json]]
+```
+
+
+
+
+```scala
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42)
+))
+// john: jsonpath.Json =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42
+// }
+```
+
+???
+- Prisms can serve to build json elements and deconstruct it 
+- but what if we want to drill into a JArr or JObj?
+- Prisms cannot zoom into a List or Map because it loses information 
+
+
+---
+# Optional
+
+```scala
+import monocle.Optional
+import monocle.std.list._
+
+def indexL[A](i: Int): Optional[List[A], A] =
+  monocle.function.all.index(i)
+
+val xs = List(1, 4, 9)
+```
+
+```scala
+indexL(2).getOption(xs)
+// res2: Option[Int] = Some(9)
+
+indexL(2).set(5)(xs)
+// res3: List[Int] = List(1, 4, 5)
+
+indexL(2).modify((_: Int) + 1)(xs)
+// res4: List[Int] = List(1, 4, 10)
+
+indexL(2).modify((_: Int) + 1)(List(1))
+// res5: List[Int] = List(1)
+```
+
+???
+- modify is a noop if it point to nothings	
+- if ypu do care about failure you can you setOption / modifyOption
+
+---
+# Prism - Optional
+	
+.center[![prism-optional](prism-optional.png)]
+	
+---
+# Index json array
+
+```scala
+import monocle.function.all.index
+```
+
+```scala
+jArr                                            : Prism[Json, List[Json]]
+
+jArr composeOptional index(2)                   : Optional[Json, Json]
+
+jArr composeOptional index(2) composePrism jNum : Optional[Json, Double] 
+
+val array = jArr(List(1,2,3,4,5,6).map(jInt(_)))
+```
+
+```scala
+(jArr composeOptional index(2) composePrism jInt).modify(_ + 10)(array)
+// res12: jsonpath.Json = [1, 2, 13, 4, 5, 6]
+```
+
+---
+# Index json object
+
+```scala
+import monocle.std.map._
+
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42)
+))
+```
+
+```scala
+(jObj composeOptional index("first_name")).getOption(john)
+// res14: Option[jsonpath.Json] = Some("john")
+```
+
+---
+# Compare json and optics API
+
+
+
+	
+```scala
+def incrementAge(json: Json): Option[Json] =
+  for {
+    obj    <- json.asObj
+    age    <- obj.get("age")
+    ageInt <- age.asInt
+    newAge  = ageInt + 1			
+  } yield JObj(obj + ("age" -> JNum(newAge.toDouble)))
+```
+
+```scala
+(jObj composeOptional index("age") composePrism jInt).modify(_ + 1)(john)
+// res15: jsonpath.Json =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 43
+// }
+```
+
+---
+# Deep indexing
+
+```scala
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+      ))
+   ))
+))
+
+val zoeAge = jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt)
+```
+
+---
+# Deep indexing
+
+```scala
+val zoeAge = jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt)
+```
+
+```scala
+zoeAge.getOption(john)
+// res17: Option[Int] = Some(28)
+
+zoeAge.modify(_ + 1)(john)
+// res18: jsonpath.Json =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42,
+//   "siblings" : [{
+//     "first_name" : "zoe",
+//     "last_name" : "doe",
+//     "age" : 29
+//   }]
+// }
+```
+
+---
+# Compare JavaScript and optics API
+
+```scala
+jObj.composeOptional(index("siblings")).
+    composePrism(jArr).composeOptional(index(0)).
+    composePrism(jObj).composeOptional(index("age")).
+    composePrism(jInt).set(25)(john)
+```
+	  
+```javascript
+john.siblings[0].age = 25
+```
+	  
+---
+# JsonPath DSL
+
+```scala
+import monocle.function.all
+
+case class JsonPath(json: Optional[Json, Json]){
+  def `null` : Optional[Json, Unit]       = json composePrism jNull
+  def boolean: Optional[Json, Boolean]    = json composePrism jBool
+  def int    : Optional[Json, Int]        = json composePrism jInt
+  def double : Optional[Json, Double]     = json composePrism jNum
+  def string : Optional[Json, String]     = json composePrism jStr
+  def arr    : Optional[Json, List[Json]] = json composePrism jArr
+  def obj    : Optional[Json, Map[String, Json]] = json composePrism jObj
+
+  def index(i: Int)     : JsonPath = JsonPath(arr composeOptional all.index(i))
+  def index(key: String): JsonPath = JsonPath(obj composeOptional all.index(key))
+}
+```
+
+???
+- JsonPath is a builder/factory for optics manipulating json
+- Prisms are useful to distinguish between different type of Json element but any interesting json path would use index, hence the need of Optional	
+- we need a top level json path, something that matches all Json: Optional.id
+- for those interested, all optics form a Category using compose and id	
+--
+
+```scala
+object JsonPath {	  
+  val root = JsonPath(Optional.id)
+}
+```
+
+---
+# JsonPath DSL
+
+
+
+
+```scala
+import jsonpath.JsonPath.root
+```
+	  
+```scala
+root.index("first_name").string.getOption(john)
+// res0: Option[String] = Some(john)
+```
+--
+
+```scala
+root.index("siblings").index(0).index("age").int.set(55)(john)
+// res1: jsonpath.Json =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42,
+//   "siblings" : [{
+//     "first_name" : "zoe",
+//     "last_name" : "doe",
+//     "age" : 55
+//   }]
+// }
+```
+
+???
+- it is nice but index is quite verbose, it would be much nicer if we could use a syntax like javascript, e.g. root.siblings instead of root.index("siblings")
+
+---
+# Dynamic
+
+```scala
+import scala.language.dynamics
+
+class Foo extends Dynamic {
+  def bar: String = "bar"
+  def selectDynamic(s: String): String = s"Dynamic $s"
+}
+
+val foo = new Foo
+```
+
+```scala
+foo.bar
+// res4: String = bar
+
+foo.hello
+// res5: String = Dynamic hello
+
+foo.selectDynamic("hello")
+// res6: String = Dynamic hello
+```
+
+---
+# Dynamic JsonPath
+
+```scala
+import monocle.function.all
+import scala.language.dynamics
+
+case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
+  def `null` : Optional[Json, Unit]       = json composePrism jNull
+  def boolean: Optional[Json, Boolean]    = json composePrism jBool
+  def int    : Optional[Json, Int]        = json composePrism jInt
+  def double : Optional[Json, Double]     = json composePrism jNum
+  def string : Optional[Json, String]     = json composePrism jStr
+  def arr    : Optional[Json, List[Json]] = json composePrism jArr
+  def obj    : Optional[Json, Map[String, Json]] = json composePrism jObj
+
+  def index(i: Int): JsonPath = JsonPath(arr composeOptional all.index(i))
+
+  def selectDynamic(field: String): JsonPath =
+    JsonPath(obj composeOptional all.index(field))
+}
+```
+
+---
+# Dynamic JsonPath
+
+
+
+
+```scala
+root.siblings.index(0).age.int.set(55)(john)
+// res0: jsonpath.Json =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42,
+//   "siblings" : [{
+//     "first_name" : "zoe",
+//     "last_name" : "doe",
+//     "age" : 55
+//   }]
+// }
+```
+--
+
+```scala
+root.foo.bar.json.getOption(john)
+// res1: Option[jsonpath.Json] = None
+```
+
+---
+# Optics
+	
+.center[![prism-optional](prism-optional.png)]
+
+---
+# Optics
+	
+.center[![prism-traversal](prism-traversal.png)]
+	    
+---
+# Traversal for Json array or object
+
+```scala
+val jDescendants: Traversal[Json, Json] = ???
+```
+
+```scala
+val arr = jArr(List(jInt(1), jInt(2), jInt(3)))
+val obj = jObj(Map("name" -> jStr("john"), "age" -> jInt(23)))
+```
+
+```scala
+jDescendants.set(jInt(1))(arr)
+// res2: jsonpath.Json = [1, 1, 1]
+
+jDescendants.set(jInt(1))(obj)
+// res3: jsonpath.Json =
+// {
+//   "name" : 1,
+//   "age" : 1
+// }
+
+jDescendants.set(jInt(1))(jStr("Hello"))
+// res4: jsonpath.Json = "Hello"
+```
+
+---
+# JsonTraversalPath
+
+```scala
+import monocle.function.all
+import scala.language.dynamics
+
+case class JsonPath(json: Optional[Json, Json]) extends Dynamic {
+  //...
+  def obj: Optional[Json, Map[String, Json]] = json composePrism jObj
+	  
+  def selectDynamic(field: String): JsonPath =
+    JsonPath(obj composeOptional all.index(field))
+
+  def each: JsonTraversalPath =
+    JsonTraversalPath(json composeTraversal jDescendants)
+}
+
+case class JsonTraversalPath(json: Traversal[Json, Json]) extends Dynamic {
+  //...	  
+  def selectDynamic(field: String): JsonTraversalPath = ???
+}
+```
+
+---
+# JsonTraversalPath
+
+
+
+	    
+```scala
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42)
+))
+```
+
+```scala
+root.each.string.getAll(john)
+// res0: List[String] = List(john, doe)
+
+root.each.string.modify(_.capitalize)(john)
+// res1: jsonpath.Json =
+// {
+//   "first_name" : "John",
+//   "last_name" : "Doe",
+//   "age" : 42
+// }
+```
+
+---
+# JsonTraversalPath
+
+```scala
+val john = jObj(Map(
+  "first_name" -> jStr("john"),
+  "last_name"  -> jStr("doe"),
+  "age"        -> jInt(42),
+  "siblings"   -> jArr(List(
+    jObj(Map(
+      "first_name" -> jStr("zoe"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(28)
+    )),
+    jObj(Map(
+      "first_name" -> jStr("dan"),
+      "last_name"  -> jStr("doe"),
+      "age"        -> jInt(24)
+    ))
+  ))
+))
+```
+
+```scala
+root.siblings.each.age.int.getAll(john)
+// res2: List[Int] = List(28, 24)
+```
+---
+# Another approach: Pimpathon
+
+--
+	    
+
+
+	    
+```scala
+import pimpathon.argonaut.JsonFrills
+```
+
+```scala
+john.descendant("$.siblings[*].age").int.modify(_ + 1).spaces2
+// res0: String =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42,
+//   "siblings" : [
+//     {
+//       "first_name" : "zoe",
+//       "last_name" : "doe",
+//       "age" : 29
+//     },
+//     {
+//       "first_name" : "dan",
+//       "last_name" : "doe",
+//       "age" : 25
+//     }
+//   ]
+// }
+```
+
+---
+# Another approach: Pimpathon
+
+```scala
+john.descendant("$.siblings[*]").renameField("last_name", "family_name").spaces2
+// res1: String =
+// {
+//   "first_name" : "john",
+//   "last_name" : "doe",
+//   "age" : 42,
+//   "siblings" : [
+//     {
+//       "first_name" : "zoe",
+//       "age" : 28,
+//       "family_name" : "doe"
+//     },
+//     {
+//       "first_name" : "dan",
+//       "age" : 24,
+//       "family_name" : "doe"
+//     }
+//   ]
+// }
+```
+
+---
+# Available today
+
+### JsonPath & JsonTraversalPath
+```scala
+"io.argonaut"          %% "argonaut-monocle" % "6.2-RC2"   // since 6.2-M2
+"io.circe"             %% "circe-optics"     % "0.7.0-M1"  // since 0.5.0
+```
+
+### String base JsonPath
+```scala
+"com.github.stacycurl" %% "pimpathon"        % "1.8.1"     // since 1.7.0
+```
+
+---
+class: center, middle	  
+
+# Thanks!
+Code and slides at `julien-truffaut/jsonpath.pres` on GitHub
+
+---
+background-image: url(Monocle.png)
+
+# Stickers
+	  
+---
+	  
+# References
+
+- [remark.js](https://github.com/gnab/remark)
+- [tut](https://github.com/tpolecat/tut)
+- [presentation.g8](https://github.com/julien-truffaut/presentation.g8)
+- [monocle](http://julien-truffaut.github.io/Monocle/)
+- [argonaut](https://github.com/argonaut-io/argonaut)
+- [circe](https://github.com/travisbrown/circe)
+- [haskell lens](https://github.com/ekmett/lens)	  
+- [Beyond Lenses: how Iso, Prism, Lens and Optional relate to each other](https://www.youtube.com/watch?v=6nyGVgGEKdA)
+
+	  
+---
+# Give me more POOOWWWER
+
+
+
+	  
+```scala
+import monocle.function.Plated
+
+def capitalizeEverywhere(json: Json): Json =
+  Plated.rewrite[Json]{
+    case jStr(s) if s != s.capitalize => Some(jStr(s.capitalize))
+    case _                            => None
+  }(json)
+```
+
+```scala
+capitalizeEverywhere(john)
+// res1: jsonpath.Json =
+// {
+//   "first_name" : "John",
+//   "last_name" : "Doe",
+//   "age" : 42,
+//   "siblings" : [{
+//     "first_name" : "Zoe",
+//     "last_name" : "Doe",
+//     "age" : 28
+//   }, {
+//     "first_name" : "Dan",
+//     "last_name" : "Doe",
+//     "age" : 24
+//   }]
+// }
+```
+
+
+ </textarea>
+    <script src="remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
